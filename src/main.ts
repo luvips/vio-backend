@@ -15,7 +15,11 @@ async function bootstrap() {
 
   // CORS restringido por lista explícita de ALLOWED_ORIGINS.
   // Se normaliza para evitar errores por espacios o slash final en ALLOWED_ORIGINS.
-  const allowedOrigins = (process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'])
+  const allowedOrigins = [
+    ...(process.env.ALLOWED_ORIGINS?.split(',') || []),
+    'http://localhost:3000',
+    'https://vio-frontend.vercel.app',
+  ]
     .map((origin) => origin.trim().replace(/\/$/, ''))
     .filter(Boolean);
 
