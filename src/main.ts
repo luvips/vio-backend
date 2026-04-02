@@ -18,22 +18,24 @@ async function bootstrap() {
     .map((origin) => origin.trim().replace(/\/$/, ''))
     .filter(Boolean);
 
-  app.enableCors({
-    origin: (origin, callback) => {
-      // Permite herramientas sin Origin (curl, health checks del servidor, etc.)
-      if (!origin) return callback(null, true);
-
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin) {
       const normalized = origin.replace(/\/$/, '');
-      const isAllowed = allowedOrigins.includes(normalized);
+      if (allowedOrigins.includes(normalized)) {
+        res.header('Access-Control-Allow-Origin', origin);
+        res.header('Vary', 'Origin');
+        res.header('Access-Control-Allow-Credentials', 'true');
+        res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      }
+    }
 
-      // Importante: no lanzar error aquí para evitar preflight 500 sin cabeceras CORS.
-      // Si el origen no está permitido, se responde sin cabeceras CORS y el navegador bloquea.
-      return callback(null, isAllowed);
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    optionsSuccessStatus: 204,
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(204);
+    }
+
+    return next();
   });
 
   app.use(cookieParser());
