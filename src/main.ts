@@ -12,9 +12,28 @@ async function bootstrap() {
   // Agrega headers de seguridad: CSP, HSTS, X-Frame-Options, X-Content-Type-Options, etc.
   app.use(helmet());
 
-  // CORS restringido a los orígenes del env — nunca wildcard; credentials: true es necesario para las cookies HttpOnly
-  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'];
-  app.enableCors({ origin: allowedOrigins, credentials: true, methods: ['GET', 'POST', 'DELETE', 'PUT', 'PATCH'] });
+  // CORS restringido por lista explícita + soporte para previews de Vercel.
+  // Se normaliza para evitar errores por espacios o slash final en ALLOWED_ORIGINS.
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'])
+    .map((origin) => origin.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+
+  app.enableCors({
+    origin: (origin, callback) => {
+      // Permite herramientas sin Origin (curl, health checks del servidor, etc.)
+      if (!origin) return callback(null, true);
+
+      const normalized = origin.replace(/\/$/, '');
+      const isAllowed =
+        allowedOrigins.includes(normalized) ||
+        /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(normalized);
+
+      return callback(isAllowed ? null : new Error('Origen no permitido por CORS'), isAllowed);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
 
   app.use(cookieParser());
   app.setGlobalPrefix('api/v1');
