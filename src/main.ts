@@ -24,9 +24,7 @@ async function bootstrap() {
       if (!origin) return callback(null, true);
 
       const normalized = origin.replace(/\/$/, '');
-      const isAllowed =
-        allowedOrigins.includes(normalized) ||
-        /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(normalized);
+      const isAllowed = allowedOrigins.includes(normalized);
 
       // Importante: no lanzar error aquí para evitar preflight 500 sin cabeceras CORS.
       // Si el origen no está permitido, se responde sin cabeceras CORS y el navegador bloquea.
