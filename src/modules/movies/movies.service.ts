@@ -46,15 +46,12 @@ export class MoviesService {
     // evitando inyección de caracteres especiales de Redis (*, \n, :) sin importar qué busque el usuario
     const queryHash = createHash('sha256').update(query.trim().toLowerCase()).digest('hex');
     return this.fetchWithResilience(`tmdb:search:${queryHash}`, `${this.tmdbBaseUrl}/search/movie`, {
-      api_key: this.tmdbApiKey,
       query: query.trim(),
     });
   }
 
   async getMovieById(id: number) {
-    return this.fetchWithResilience(`tmdb:movie:${id}`, `${this.tmdbBaseUrl}/movie/${id}`, {
-      api_key: this.tmdbApiKey,
-    });
+    return this.fetchWithResilience(`tmdb:movie:${id}`, `${this.tmdbBaseUrl}/movie/${id}`, {});
   }
 
   // Orden de prioridad: caché fresca  interruptor de circuito HTTP con reintentos  caché antigua  error
@@ -111,14 +108,22 @@ export class MoviesService {
   }
 
   private async fetchFromTMDB(url: string, params: Record<string, any>) {
+    const token = (this.tmdbApiKey || '').trim();
+    const useBearer = token.startsWith('eyJ');
+    const requestParams = useBearer ? params : { ...params, api_key: token };
+    const requestHeaders = useBearer ? { Authorization: `Bearer ${token}` } : undefined;
+
     const { data } = await firstValueFrom(
-      this.httpService.get(url, { params, timeout: 5000 }).pipe(
+      this.httpService.get(url, { params: requestParams, headers: requestHeaders, timeout: 5000 }).pipe(
         retry({
           count: this.RETRY_ATTEMPTS,
           delay: (_err, retryCount) => timer(retryCount * 1000), // espera progresiva: 1s, 2s
         }),
         catchError((error) => {
           if (error.response?.status === 404) throw new NotFoundException('Película no encontrada');
+          if (error.response?.status === 401 || error.response?.status === 403) {
+            throw new BadGatewayException('TMDB rechazó las credenciales configuradas');
+          }
           // Nunca se expone el error original de Axios al cliente
           throw new BadGatewayException('Servicio externo no disponible');
         }),
