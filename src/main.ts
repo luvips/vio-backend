@@ -12,7 +12,7 @@ async function bootstrap() {
   // Agrega headers de seguridad: CSP, HSTS, X-Frame-Options, X-Content-Type-Options, etc.
   app.use(helmet());
 
-  // CORS restringido por lista explícita + soporte para previews de Vercel.
+  // CORS restringido por lista explícita de ALLOWED_ORIGINS.
   // Se normaliza para evitar errores por espacios o slash final en ALLOWED_ORIGINS.
   const allowedOrigins = (process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'])
     .map((origin) => origin.trim().replace(/\/$/, ''))
@@ -24,9 +24,7 @@ async function bootstrap() {
       if (!origin) return callback(null, true);
 
       const normalized = origin.replace(/\/$/, '');
-      const isAllowed =
-        allowedOrigins.includes(normalized) ||
-        /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(normalized);
+      const isAllowed = allowedOrigins.includes(normalized);
 
       return callback(isAllowed ? null : new Error('Origen no permitido por CORS'), isAllowed);
     },

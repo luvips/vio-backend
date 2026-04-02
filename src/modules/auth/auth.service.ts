@@ -15,7 +15,7 @@ import { Cache } from 'cache-manager';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomUUID } from 'crypto';
 import * as fs from 'fs';
-import { Request, Response } from 'express';
+import { Request, Response, CookieOptions } from 'express';
 import { LoginDto } from './dto/login.dto';
 
 // Umbral independiente del throttle por IP para resistir fuerza bruta distribuida desde múltiples IPs
@@ -187,10 +187,10 @@ export class AuthService {
 
   async logout(userId: string, req: Request, res: Response) {
     await this.usersService.updateRefreshTokenHash(userId, null);
-    const secure = this.isSecureContext(req);
+    const cookieOptions = this.buildCookieOptions(req);
     // clearCookie necesita los mismos atributos con los que se creó la cookie, si no el navegador la ignora
-    res.clearCookie('access_token', { httpOnly: true, secure, sameSite: 'strict', path: '/' });
-    res.clearCookie('refresh_token', { httpOnly: true, secure, sameSite: 'strict', path: '/' });
+    res.clearCookie('access_token', cookieOptions);
+    res.clearCookie('refresh_token', cookieOptions);
     res.setHeader('Cache-Control', 'no-store');
     this.logSecurityEvent('AUTH_LOGOUT', { userId, ip: req.ip });
     return { success: true };
@@ -228,11 +228,16 @@ export class AuthService {
   }
 
   private setCookies(res: Response, accessToken: string, refreshToken: string, req: Request) {
-    const secure = this.isSecureContext(req);
-    const base = { httpOnly: true, secure, sameSite: 'strict' as const, path: '/' };
+    const base = this.buildCookieOptions(req);
     // httpOnly impide que JS acceda a la cookie — mitiga el robo de tokens via XSS
-    // sameSite: strict evita que se envíe en peticiones cross-site — mitiga CSRF
+    // En producción cross-site requiere SameSite=None y Secure=true para que el navegador envíe cookies.
     res.cookie('access_token', accessToken, { ...base, maxAge: 15 * 60 * 1000 });
     res.cookie('refresh_token', refreshToken, { ...base, maxAge: 7 * 24 * 60 * 60 * 1000 });
+  }
+
+  private buildCookieOptions(req: Request): CookieOptions {
+    const secure = this.isSecureContext(req);
+    const sameSite: 'none' | 'lax' = secure ? 'none' : 'lax';
+    return { httpOnly: true, secure, sameSite, path: '/' as const };
   }
 }
