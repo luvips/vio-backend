@@ -25,7 +25,7 @@ export class AuthController {
   }
 
   @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: 5, ttl: 15 * 60 * 1000 } })
+  @Throttle({ default: { limit: 10, ttl: 15 * 60 * 1000 } })
   @Post('login')
   async login(@Body() loginDto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     // passthrough: true permite que Nest serialice el retorno y que se puedan escribir cookies en el res nativo
