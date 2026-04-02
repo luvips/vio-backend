@@ -15,8 +15,24 @@ export class JwtAuthGuard implements CanActivate {
   private publicKey: string;
 
   constructor(private readonly jwtService: JwtService, private readonly configService: ConfigService) {
+    const envPublicKey = this.normalizePem(this.configService.get<string>('JWT_PUBLIC_KEY'));
     const keyPath = this.configService.get<string>('JWT_PUBLIC_KEY_PATH');
-    if (keyPath) this.publicKey = fs.readFileSync(keyPath, 'utf8');
+    this.publicKey = envPublicKey || (keyPath ? fs.readFileSync(keyPath, 'utf8') : '');
+  }
+
+  private normalizePem(value?: string): string {
+    if (!value) return '';
+    const trimmed = value.trim();
+    if (trimmed.includes('BEGIN')) return trimmed.replace(/\\n/g, '\n');
+
+    try {
+      const decoded = Buffer.from(trimmed, 'base64').toString('utf8');
+      if (decoded.includes('BEGIN')) return decoded;
+    } catch {
+      return '';
+    }
+
+    return '';
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {

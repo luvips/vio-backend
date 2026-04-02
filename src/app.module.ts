@@ -7,8 +7,10 @@ import { envValidationSchema } from './config/env.validation';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { MoviesModule } from './modules/movies/movies.module';
+import { HealthController } from './health.controller';
 
 @Module({
+  controllers: [HealthController],
   imports: [
     // La app rechaza arrancar si falta alguna variable de entorno requerida — falla rápido antes que en silencio
     ConfigModule.forRoot({

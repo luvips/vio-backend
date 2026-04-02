@@ -35,14 +35,41 @@ export class AuthService {
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {
     try {
+      const envPrivateKey = this.normalizePem(this.configService.get<string>('JWT_PRIVATE_KEY'));
+      const envPublicKey = this.normalizePem(this.configService.get<string>('JWT_PUBLIC_KEY'));
       const privatePath = this.configService.get<string>('JWT_PRIVATE_KEY_PATH');
       const publicPath = this.configService.get<string>('JWT_PUBLIC_KEY_PATH');
-      if (privatePath) this.privateKey = fs.readFileSync(privatePath, 'utf8');
-      if (publicPath) this.publicKey = fs.readFileSync(publicPath, 'utf8');
+
+      this.privateKey = envPrivateKey || (privatePath ? fs.readFileSync(privatePath, 'utf8') : '');
+      this.publicKey = envPublicKey || (publicPath ? fs.readFileSync(publicPath, 'utf8') : '');
+
+      if (!this.privateKey || !this.publicKey) {
+        throw new Error('Missing JWT key material');
+      }
     } catch {
       this.logger.error('CRÍTICO: No se pudieron cargar las claves JWT');
       throw new InternalServerErrorException('Error de configuración del servidor');
     }
+  }
+
+  // Permite cargar PEM desde variables de entorno en contenedores:
+  // 1) clave literal multilínea, 2) clave con \n escapado, 3) PEM codificado en base64
+  private normalizePem(value?: string): string {
+    if (!value) return '';
+    const trimmed = value.trim();
+
+    if (trimmed.includes('BEGIN')) {
+      return trimmed.replace(/\\n/g, '\n');
+    }
+
+    try {
+      const decoded = Buffer.from(trimmed, 'base64').toString('utf8');
+      if (decoded.includes('BEGIN')) return decoded;
+    } catch {
+      return '';
+    }
+
+    return '';
   }
 
   // Los primeros 8 chars del SHA-256 bastan para correlacionar eventos del mismo usuario
